@@ -1,0 +1,38 @@
+﻿DAY 1 — DUMMY BASELINE
+
+1. Dummy RMSE vs. target standard deviation
+
+The Skore Dummy report gives RMSE = 16.48. The EDA standard deviation of target is 16.50, a difference of only 0.02. This is expected: a mean Dummy predicts nearly the same value for every visit, so its expected RMSE is approximately the target standard deviation.
+
+Other Dummy metrics: MAE = 13.48, R² = -2.32e-6, fit time = 0.01 s, predict time = 7.16e-5 s. MAPE is about 7.00 × 10^14 and is not informative here because percentage errors explode when actual targets are zero or close to zero.
+
+2. Prediction-error plot
+
+With actual values on the x-axis and predictions on the y-axis, the Dummy forms a horizontal band near the training mean: predictions barely change while actual values vary widely. A perfect model would put every point on the diagonal y = x.
+
+3. Baseline to beat
+
+Dummy baseline: RMSE = 16.48. A model should beat this. As an initial practical threshold, I would look for at least 0.50 RMSE points of improvement and confirm that the gain is consistent across patient-grouped folds.
+
+
+WRAP-UP — SUBMISSION 53_BLEND_NN12
+
+1. Which change helped most? Which gave none?
+
+The largest overall improvement came from moving beyond a single visit-level prediction and using patient history, then blending complementary models. The submission 53 README reports OOF RMSE improving from 3.389 at the starting point to 2.6558 for the final blend. The final Skore report is consistent with that result: RMSE 2.66 ± 0.11, MAE 1.81 ± 0.06, and R² 0.97 ± 0.002. The pipeline combines patient trajectories, posterior estimates, pairwise-visit predictions, and neural networks; together, they capture complementary signals.
+
+Grouped CV gave no direct improvement to the predictions themselves. Its role is to measure generalization to unseen patients and prevent visits from the same patient appearing in both training and validation. It improves the reliability of the score, not the model's RMSE by itself. The available comparison supports the full pipeline's improvement; it does not show that any individual feature family had exactly zero value.
+
+2. What do the visits with the largest errors have in common?
+
+My best explanation is that the largest errors are more likely on visits with no measured OFF score, especially when medication-timing information is also missing or unreliable. The model then has to infer true OFF from ON measurements, medication information, and the patient's other visits. I would also expect unusually high or low target values to appear among the largest errors, since RMSE squares errors and therefore gives extreme misses more weight.
+
+Cohort and disease stage may contribute, but the code already includes cohort and patient age/timeline features. The Skore report also flags variation across splits (RMSE 2.66 ± 0.11), so performance may depend on which patients are held out. Overall, missing OFF and uncertain drug timing are the most plausible shared factors behind the largest errors.
+
+3. Which modelling problem remains, and what feature comes next?
+
+The code addresses all three CONTEXT.md problems to some extent: patient-level curves and visit-history features model temporal progression; time-since-intake and dose-related features address drug timing; and missingness indicators, interpolation, and availability patterns address missing data. Drug timing seems the least fully represented, so I would refine that next.
+
+I would add a patient-specific levodopa exposure/effect estimate for each visit, combining dose, time since intake, and the patient's observed ON/OFF response. This should represent medication-effect decay and differences in treatment response between patients. Related PK features already exist, so I would test this as a refinement and keep it only if it consistently improves RMSE/MAE across the same patient-grouped folds.
+
+Additional Skore diagnostic: it reports 210 feature pairs with Spearman correlation above 0.9. This indicates substantial redundancy, but correlated features are not automatically harmful for this nonlinear ensemble. I would test removing redundant groups with the same grouped folds rather than assume that pruning them helps. Skore's overfitting/underfitting flags are prompts to inspect train-vs-validation and fold results, not proof by themselves.
